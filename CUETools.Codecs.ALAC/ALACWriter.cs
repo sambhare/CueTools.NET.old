@@ -36,7 +36,7 @@ namespace CUETools.Codecs.ALAC
 	public class ALACWriterSettings: AudioEncoderSettings
 	{
         public ALACWriterSettings()
-            : base("0 1 2 3 4 5 6 7 8 9 10", "3")
+            : base("0 1 2 3 4 5 6 7 8 9 10", "5")
         {
         }
 
@@ -91,7 +91,9 @@ namespace CUETools.Codecs.ALAC
 		int[] verifyBuffer;
 		int[] residualBuffer;
 		float[] windowBuffer;
-		int samplesInBuffer = 0;
+        WindowFunction[] windowType;
+        LpcWindowSection[,] windowSections;
+        int samplesInBuffer = 0;
 
 		int m_blockSize = 0;
 		int _totalSize = 0;
@@ -122,7 +124,9 @@ namespace CUETools.Codecs.ALAC
 
             samplesBuffer = new int[Alac.MAX_BLOCKSIZE * (Settings.PCM.ChannelCount == 2 ? 5 : Settings.PCM.ChannelCount)];
             residualBuffer = new int[Alac.MAX_BLOCKSIZE * (Settings.PCM.ChannelCount == 2 ? 6 : Settings.PCM.ChannelCount + 1)];
-			windowBuffer = new float[Alac.MAX_BLOCKSIZE * 2 * Alac.MAX_LPC_WINDOWS];
+			windowBuffer = new float[Alac.MAX_BLOCKSIZE * 2 * lpc.MAX_LPC_WINDOWS];
+            windowType = new WindowFunction[lpc.MAX_LPC_WINDOWS];
+            windowSections = new LpcWindowSection[lpc.MAX_LPC_WINDOWS, lpc.MAX_LPC_SECTIONS];
 
             eparams.set_defaults(m_settings.EncoderModeIndex);
 
@@ -834,7 +838,7 @@ namespace CUETools.Codecs.ALAC
 			}
 		}
 
-		unsafe void encode_residual(ALACFrame frame, int ch, int pass, int best_window)
+		unsafe void encode_residual(ALACFrame frame, int ch, int pass, int best_windows)
 		{
 			int* smp = frame.subframes[ch].samples;
 			int i, n = frame.blocksize;
@@ -870,12 +874,15 @@ namespace CUETools.Codecs.ALAC
 
 			for (int iWindow = 0; iWindow < _windowcount; iWindow++)
 			{
-				if (best_window != -1 && iWindow != best_window)
+				if (0 == (best_windows & (1 << iWindow)))
 					continue;
 
 				LpcContext lpc_ctx = frame.subframes[ch].lpc_ctx[iWindow];
 
-				lpc_ctx.GetReflection(max_order, smp, n, frame.window_buffer + iWindow * Alac.MAX_BLOCKSIZE * 2);
+                fixed (LpcWindowSection* sections = &windowSections[iWindow, 0])
+                    lpc_ctx.GetReflection(
+                        frame.subframes[ch].sf, max_order, frame.blocksize, smp, 
+                        frame.window_buffer + iWindow * Alac.MAX_BLOCKSIZE * 2, sections);
 				lpc_ctx.ComputeLPC(lpcs);
 				lpc_ctx.SortOrdersAkaike(frame.blocksize, eparams.estimation_depth, min_order, max_order, 5.0, 1.0/18);
 				for (i = 0; i < eparams.estimation_depth && i < max_order; i++)
@@ -915,7 +922,7 @@ namespace CUETools.Codecs.ALAC
 			bitwriter.flush();
 		}
 
-		unsafe void encode_residual_pass1(ALACFrame frame, int ch, int best_window)
+		unsafe void encode_residual_pass1(ALACFrame frame, int ch, int best_windows)
 		{
 			int max_prediction_order = eparams.max_prediction_order;
 			int estimation_depth = eparams.estimation_depth;
@@ -925,7 +932,7 @@ namespace CUETools.Codecs.ALAC
 			eparams.estimation_depth = 1;
 			eparams.min_modifier = eparams.max_modifier;
 			eparams.adaptive_passes = 0;
-			encode_residual(frame, ch, 1, best_window);
+			encode_residual(frame, ch, 1, best_windows);
 			eparams.max_prediction_order = max_prediction_order;
 			eparams.estimation_depth = estimation_depth;
 			eparams.min_modifier = min_modifier;
@@ -937,32 +944,89 @@ namespace CUETools.Codecs.ALAC
 			encode_residual(frame, ch, 2, estimate_best_window(frame, ch));
 		}
 
+        unsafe int estimate_best_windows_akaike(ALACFrame frame, int ch, int count, bool onePerType)
+        {
+            int* windows_present = stackalloc int[_windowcount];
+            for (int i = 0; i < _windowcount; i++)
+                windows_present[i] = 0;
+            if (onePerType)
+            {
+                for (int i = 0; i < _windowcount; i++)
+                    for (int j = 0; j < _windowcount; j++)
+                        if (windowType[j] == windowType[i])
+                            windows_present[j]++;
+            }
+
+            int order = Math.Min(4, eparams.max_prediction_order);
+            float* err = stackalloc float[lpc.MAX_LPC_ORDER];
+            for (int i = 0; i < _windowcount; i++)
+            {
+                LpcContext lpc_ctx = frame.subframes[ch].lpc_ctx[i];
+                fixed (LpcWindowSection* sections = &windowSections[i, 0])
+                    lpc_ctx.GetReflection(
+                        frame.subframes[ch].sf, order, frame.blocksize,
+                        frame.subframes[ch].samples,
+                        frame.window_buffer + i * Alac.MAX_BLOCKSIZE * 2, sections);
+                lpc_ctx.SortOrdersAkaike(frame.blocksize, 1, 1, order, 4.5, 0.0);
+                err[i] = (float)(lpc_ctx.Akaike(frame.blocksize, lpc_ctx.best_orders[0], 4.5, 0.0) - frame.blocksize * Math.Log(lpc_ctx.autocorr_values[0]) / 2);
+            }
+            int* best_windows = stackalloc int[lpc.MAX_LPC_ORDER];
+            for (int i = 0; i < _windowcount; i++)
+                best_windows[i] = i;
+            for (int i = 0; i < _windowcount; i++)
+            {
+                for (int j = i + 1; j < _windowcount; j++)
+                {
+                    if (err[best_windows[i]] > err[best_windows[j]])
+                    {
+                        int tmp = best_windows[j];
+                        best_windows[j] = best_windows[i];
+                        best_windows[i] = tmp;
+                    }
+                }
+            }
+
+            int window_mask = 0;
+            if (onePerType)
+            {
+                for (int i = 0; i < _windowcount; i++)
+                    windows_present[i] = count;
+                for (int i = 0; i < _windowcount; i++)
+                {
+                    int w = best_windows[i];
+                    if (windows_present[w] > 0)
+                    {
+                        for (int j = 0; j < _windowcount; j++)
+                            if (windowType[j] == windowType[w])
+                                windows_present[j]--;
+                        window_mask |= 1 << w;
+                    }
+                }
+            }
+            else
+            {
+                for (int i = 0; i < _windowcount && i < count; i++)
+                    window_mask |= 1 << best_windows[i];
+            }
+            return window_mask;
+        }
+
 		unsafe int estimate_best_window(ALACFrame frame, int ch)
 		{
 			if (_windowcount == 1)
-				return 0;
+				return 1;
 			switch (eparams.window_method)
 			{
 				case WindowMethod.Estimate:
-					{
-						int best_window = -1;
-						double best_error = 0;
-						int order = 2;
-						for (int i = 0; i < _windowcount; i++)
-						{
-							frame.subframes[ch].lpc_ctx[i].GetReflection(order, frame.subframes[ch].samples, frame.blocksize, frame.window_buffer + i * Alac.MAX_BLOCKSIZE * 2);
-							double err = frame.subframes[ch].lpc_ctx[i].prediction_error[order - 1] / frame.subframes[ch].lpc_ctx[i].autocorr_values[0];
-							if (best_window == -1 || best_error > err)
-							{
-								best_window = i;
-								best_error = err;
-							}
-						}
-						return best_window;
-					}
-				case WindowMethod.Evaluate:
+                    return estimate_best_windows_akaike(frame, ch, 1, false);
+                case WindowMethod.EstimateN:
+                    return estimate_best_windows_akaike(frame, ch, 1, true);
+                case WindowMethod.EvaluateN:
+                    encode_residual_pass1(frame, ch, estimate_best_windows_akaike(frame, ch, 1, true));
+                    return 1 << frame.subframes[ch].best.window;
+                case WindowMethod.Evaluate:
 					encode_residual_pass1(frame, ch, -1);
-					return frame.subframes[ch].best.window;
+					return 1 << frame.subframes[ch].best.window;
 				case WindowMethod.Search:
 					return -1;
 			}
@@ -978,17 +1042,22 @@ namespace CUETools.Codecs.ALAC
 				case StereoMethod.Estimate:
 					for (int ch = 0; ch < subframes; ch++)
 					{
-						LpcContext lpc_ctx = frame.subframes[ch].lpc_ctx[0];
-						int stereo_order = Math.Min(8, eparams.max_prediction_order);
+                        int iWindow = 0;
+                        LpcContext lpc_ctx = frame.subframes[ch].lpc_ctx[iWindow];
+                        int stereo_order = Math.Min(8, eparams.max_prediction_order);
 						double alpha = 1.5; // 4.5 + eparams.max_prediction_order / 10.0;
-						lpc_ctx.GetReflection(stereo_order, frame.subframes[ch].samples, frame.blocksize, frame.window_buffer);
+                        fixed (LpcWindowSection* sections = &windowSections[iWindow, 0])
+                            lpc_ctx.GetReflection(
+                                frame.subframes[ch].sf, stereo_order, frame.blocksize,
+                                frame.subframes[ch].samples,
+                                frame.window_buffer + iWindow * Alac.MAX_BLOCKSIZE * 2, sections);
 						lpc_ctx.SortOrdersAkaike(frame.blocksize, 1, 1, stereo_order, alpha, 0);
 						frame.subframes[ch].best.size = (uint)Math.Max(0, lpc_ctx.Akaike(frame.blocksize, lpc_ctx.best_orders[0], alpha, 0));
 					}
 					break;
 				case StereoMethod.Evaluate:
 					for (int ch = 0; ch < subframes; ch++)
-						encode_residual_pass1(frame, ch, 0);
+						encode_residual_pass1(frame, ch, 1);
 					break;
 				case StereoMethod.Search:
 					for (int ch = 0; ch < subframes; ch++)
@@ -1060,19 +1129,24 @@ namespace CUETools.Codecs.ALAC
 
 		unsafe void calculate_window(float * window, window_function func, WindowFunction flag)
 		{
-			if ((eparams.window_function & flag) == 0 || _windowcount == Alac.MAX_LPC_WINDOWS)
+			if ((eparams.window_function & flag) == 0 || _windowcount == lpc.MAX_LPC_WINDOWS)
 				return;
 			int sz = _windowsize;
 			float* pos = window + _windowcount * Alac.MAX_BLOCKSIZE * 2;
 			do
 			{
-				func(pos, sz);
+                windowSections[_windowcount, 0].setData(0, sz);
+                for (int j = 1; j < lpc.MAX_LPC_SECTIONS; j++)
+                    windowSections[_windowcount, j].setZero(sz, sz);
+                func(pos, sz);
+                break;
 				if ((sz & 1) != 0)
 					break;
 				pos += sz;
 				sz >>= 1;
 			} while (sz >= 32);
-			_windowcount++;
+            windowType[_windowcount] = flag;
+            _windowcount++;
 		}
 
 		unsafe int encode_frame(ref int size)
@@ -1091,9 +1165,33 @@ namespace CUETools.Codecs.ALAC
 					calculate_window(window, lpc.window_tukey, WindowFunction.Tukey);
 					calculate_window(window, lpc.window_hann, WindowFunction.Hann);
 					calculate_window(window, lpc.window_flattop, WindowFunction.Flattop);
-					if (_windowcount == 0)
+                    int tukey_parts = 2;
+                    double overlap = -0.3;
+                    double overlap_units = overlap / (1.0 - overlap);
+                    for (int m = 0; m < tukey_parts; m++)
+                        calculate_window(window, (w, wsz) =>
+                        {
+                            lpc.window_punchout_tukey(w, wsz, 0.1,
+                                m / (tukey_parts + overlap_units),
+                                (m + 1 + overlap_units) / (tukey_parts + overlap_units));
+                        }, WindowFunction.PartialTukey);
+
+                    tukey_parts = 3;
+                    overlap = -0.1;
+                    //overlap = 0.1;
+                    overlap_units = overlap / (1.0 - overlap);
+                    for (int m = 0; m < tukey_parts; m++)
+                        calculate_window(window, (w, wsz) =>
+                        {
+                            lpc.window_punchout_tukey(w, wsz, 0.1,
+                                m / (tukey_parts + overlap_units),
+                                (m + 1 + overlap_units) / (tukey_parts + overlap_units));
+                        }, WindowFunction.PunchoutTukey);
+                    if (_windowcount == 0)
 						throw new Exception("invalid windowfunction");
-				}
+                    fixed (LpcWindowSection* sections = &windowSections[0, 0])
+                        LpcWindowSection.Detect(_windowcount, window, Alac.MAX_BLOCKSIZE * 2, _windowsize, Settings.PCM.BitsPerSample, sections);
+                }
 				frame.window_buffer = window;
 
                 int bps = Settings.PCM.BitsPerSample + Settings.PCM.ChannelCount - 1;
@@ -1753,10 +1851,10 @@ namespace CUETools.Codecs.ALAC
 			}
 
 			// default to level 5 params
-			window_function = WindowFunction.Flattop | WindowFunction.Tukey;
+            window_function = WindowFunction.PartialTukey | WindowFunction.PunchoutTukey;
 			order_method = OrderMethod.Estimate;
-			stereo_method = StereoMethod.Evaluate;
-			window_method = WindowMethod.Evaluate;
+			stereo_method = StereoMethod.Estimate;
+			window_method = WindowMethod.Estimate;
 			block_time_ms = 105;
 			min_modifier = 4;
 			max_modifier = 4;
@@ -1772,51 +1870,50 @@ namespace CUETools.Codecs.ALAC
 			{
 				case 0:
 					stereo_method = StereoMethod.Independent;
-					window_function = WindowFunction.Hann;
 					max_prediction_order = 6;
 					break;
 				case 1:
 					stereo_method = StereoMethod.Independent;
-					window_function = WindowFunction.Hann;
 					max_prediction_order = 8;
 					break;
 				case 2:
-					stereo_method = StereoMethod.Estimate;
-					window_function = WindowFunction.Hann;
 					max_prediction_order = 6;
 					break;
 				case 3:
-					stereo_method = StereoMethod.Estimate;
-					window_function = WindowFunction.Hann;
+                    window_function = WindowFunction.PartialTukey;
 					max_prediction_order = 8;
 					break;
 				case 4:
-					stereo_method = StereoMethod.Estimate;
-					window_method = WindowMethod.Estimate;
+                    window_function = WindowFunction.PunchoutTukey;
 					max_prediction_order = 8;
 					break;
 				case 5:
-					stereo_method = StereoMethod.Estimate;
-					window_method = WindowMethod.Estimate;
+                    window_function = WindowFunction.PunchoutTukey;
 					break;
 				case 6:
-					stereo_method = StereoMethod.Estimate;
+                    window_method = WindowMethod.EvaluateN;
 					break;
 				case 7:
-					stereo_method = StereoMethod.Estimate;
+					window_method = WindowMethod.EvaluateN;
 					adaptive_passes = 1;
 					min_modifier = 2;
 					break;
 				case 8:
+                    stereo_method = StereoMethod.Evaluate;
+					window_method = WindowMethod.EvaluateN;
 					adaptive_passes = 1;
 					min_modifier = 2;
 					break;
 				case 9:
+                    stereo_method = StereoMethod.Evaluate;
+                    window_method = WindowMethod.EvaluateN;
 					adaptive_passes = 1;
 					max_prediction_order = 30;
 					min_modifier = 2;
 					break;
 				case 10:
+                    stereo_method = StereoMethod.Evaluate;
+                    window_method = WindowMethod.EvaluateN;
 					estimation_depth = 2;
 					adaptive_passes = 2;
 					max_prediction_order = 30;
