@@ -996,11 +996,13 @@ Global
 		{D41FEFF9-9D43-4049-BF9B-B13D9AC7E192}.Release|x86.ActiveCfg = Release|Any CPU
 		{0AC7691C-562A-4879-8A11-6C7890BF659B}.Debug|Any CPU.ActiveCfg = Debug
 		{0AC7691C-562A-4879-8A11-6C7890BF659B}.Debug|Mixed Platforms.ActiveCfg = Debug
+		{0AC7691C-562A-4879-8A11-6C7890BF659B}.Debug|Mixed Platforms.Build.0 = Debug
 		{0AC7691C-562A-4879-8A11-6C7890BF659B}.Debug|Win32.ActiveCfg = Debug
 		{0AC7691C-562A-4879-8A11-6C7890BF659B}.Debug|x64.ActiveCfg = Debug
 		{0AC7691C-562A-4879-8A11-6C7890BF659B}.Debug|x86.ActiveCfg = Debug
 		{0AC7691C-562A-4879-8A11-6C7890BF659B}.Release|Any CPU.ActiveCfg = Release
 		{0AC7691C-562A-4879-8A11-6C7890BF659B}.Release|Mixed Platforms.ActiveCfg = Release
+		{0AC7691C-562A-4879-8A11-6C7890BF659B}.Release|Mixed Platforms.Build.0 = Release
 		{0AC7691C-562A-4879-8A11-6C7890BF659B}.Release|Win32.ActiveCfg = Release
 		{0AC7691C-562A-4879-8A11-6C7890BF659B}.Release|x64.ActiveCfg = Release
 		{0AC7691C-562A-4879-8A11-6C7890BF659B}.Release|x86.ActiveCfg = Release
