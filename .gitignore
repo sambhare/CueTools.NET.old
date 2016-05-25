@@ -20,3 +20,6 @@ CUETools/ipch/
 flac/src/libFLAC/x64/
 flac/src/libFLAC/Release/
 *.VC.db
+CUETools.CTDB.EACPlugin.Installer/*/*.msi
+CUETools/objs/*
+CUETools/x64/*
