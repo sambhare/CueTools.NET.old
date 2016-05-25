@@ -41,6 +41,7 @@ using CUETools.Compression;
 using CUETools.Processor;
 using CUETools.Processor.Settings;
 using CUETools.Codecs;
+using Microsoft.WindowsAPICodePack.Taskbar;
 
 namespace JDP
 {
@@ -81,6 +82,11 @@ namespace JDP
             //m_state_image_list.ColorDepth = ColorDepth.Depth32Bit;
             //m_state_image_list.Images.Add("blank", new Bitmap(16, 16));
             //m_state_image_list.Images.Add("cue", Properties.Resources.cue3);
+
+            if (TaskbarManager.IsPlatformSupported)
+            {
+                m_tbManager = TaskbarManager.Instance;
+            }
         }
 
         private void AddCheckedNodesToBatch(TreeNodeCollection nodes)
@@ -430,6 +436,8 @@ namespace JDP
         // ********************************************************************************
 
         private CUEControls.IIconManager m_icon_mgr;
+        private TaskbarManager m_tbManager = null;
+
         //private ImageList m_state_image_list;
         List<string> _batchPaths;
         StringBuilder _batchReport;
@@ -1214,7 +1222,10 @@ namespace JDP
                     toolStripStatusLabelProcessed.Visible = true;
                 }
                 toolStripStatusLabel1.Text = e.status.Replace("&", "&&");
-                toolStripProgressBar2.Value = Math.Max(0, Math.Min(100, (int)(e.percent * 100)));
+                var progressValue = Math.Max(0, Math.Min(100, (int)(e.percent * 100))); 
+                toolStripProgressBar2.Value = progressValue;
+                if (m_tbManager != null) 
+                    m_tbManager.SetProgressValue(progressValue, 100);
 
                 toolStripStatusLabelAR.Enabled = e.cueSheet != null && e.cueSheet.ArVerify != null && e.cueSheet.ArVerify.ARStatus == null;
                 toolStripStatusLabelAR.Text = e.cueSheet != null && e.cueSheet.ArVerify != null && e.cueSheet.ArVerify.ExceptionStatus == WebExceptionStatus.Success ? e.cueSheet.ArVerify.WorstTotal().ToString() : "";
@@ -1258,6 +1269,8 @@ namespace JDP
             btnResume.Visible = false;
             toolStripStatusLabel1.Text = String.Empty;
             toolStripProgressBar2.Value = 0;
+            if (m_tbManager != null)
+                m_tbManager.SetProgressState(TaskbarProgressBarState.NoProgress);
             toolStripStatusLabelAR.Visible = false;
             toolStripStatusLabelCTDB.Visible = false;
             if (ReportState)

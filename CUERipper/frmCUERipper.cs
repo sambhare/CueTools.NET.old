@@ -17,6 +17,7 @@ using Freedb;
 using CUETools.Codecs;
 using System.Xml;
 using System.Xml.Serialization;
+using Microsoft.WindowsAPICodePack.Taskbar;
 
 namespace CUERipper
 {
@@ -30,6 +31,7 @@ namespace CUERipper
 		private DriveInfo selectedDriveInfo;
 		private string _pathOut;
 		private CUEControls.ShellIconMgr m_icon_mgr;
+        private TaskbarManager m_tbManager;
         private bool testAndCopy = false;
 		internal CUERipperData data = new CUERipperData();
         private bool initDone = false;
@@ -52,7 +54,11 @@ namespace CUERipper
 			m_icon_mgr.SetExtensionIcon(".m4a", Properties.Resources.ipod_sound);
 			m_icon_mgr.SetExtensionIcon(".ogg", Properties.Resources.ogg);
             m_icon_mgr.SetExtensionIcon(".wma", Properties.Resources.wma);
-		}
+            if (TaskbarManager.IsPlatformSupported)
+            {
+                m_tbManager = TaskbarManager.Instance;
+            }
+        }
 
 		string[] OutputPathUseTemplates = {
 			"%music%\\%artist%\\[%year% - ]%album%\\%artist% - %album%[ '('disc %discnumberandname%')'].cue",
@@ -316,7 +322,10 @@ namespace CUERipper
 			buttonGo.Visible = !running;
 			toolStripStatusLabel1.Text = String.Empty;
 			toolStripProgressBar1.Value = 0;
-			progressBarErrors.Value = 0;
+            if (m_tbManager != null)
+                m_tbManager.SetProgressState(TaskbarProgressBarState.NoProgress);
+
+            progressBarErrors.Value = 0;
 			progressBarCD.Value = 0;
 
 			buttonTracks.Enabled = data.selectedRelease != null && !running;
@@ -359,7 +368,10 @@ namespace CUERipper
 			this.BeginInvoke((MethodInvoker)delegate()
 			{
 				toolStripStatusLabel1.Text = e.uri;
-				toolStripProgressBar1.Value = Math.Max(0, Math.Min(100, (int)(e.percent * 100)));
+                var progressValue = Math.Max(0, Math.Min(100, (int)(e.percent * 100)));
+                toolStripProgressBar1.Value = progressValue;
+                if (m_tbManager != null)
+                    m_tbManager.SetProgressValue(progressValue, 100);
 			});
 		}
 
@@ -380,8 +392,11 @@ namespace CUERipper
 			this.BeginInvoke((MethodInvoker)delegate()
 			{
 				toolStripStatusLabel1.Text = status;
-				toolStripProgressBar1.Value = Math.Max(0, Math.Min(100, (int)(percentTrck * 100)));
-
+                var progressValue = Math.Max(0, Math.Min(100, (int)(percentTrck * 100)));
+                toolStripProgressBar1.Value = progressValue;
+                if (m_tbManager != null)
+                    m_tbManager.SetProgressValue(progressValue, 100);
+                
                 progressBarErrors.Value = Math.Min(progressBarErrors.Maximum, (int)(100 * Math.Log(e.ErrorsCount / 10.0 + 1) / Math.Log((e.PassEnd - e.PassStart) / 10.0 + 1)));
 				progressBarErrors.Enabled = e.Pass >= audioSource.CorrectionQuality;
 
@@ -630,7 +645,10 @@ namespace CUERipper
 			this.BeginInvoke((MethodInvoker)delegate()
 			{
 				toolStripStatusLabel1.Text = text;
-				toolStripProgressBar1.Value = (100 + 2 * toolStripProgressBar1.Value) / 3;
+                var progressValue = (100 + 2 * toolStripProgressBar1.Value) / 3;
+                toolStripProgressBar1.Value = progressValue;
+                if (m_tbManager != null)
+                    m_tbManager.SetProgressValue(progressValue, 100);
 			});
 		}
 
@@ -1540,6 +1558,8 @@ namespace CUERipper
         {
             toolStripStatusLabel1.Text = "";
             toolStripProgressBar1.Value = 0;
+            if (m_tbManager != null)
+                m_tbManager.SetProgressState(TaskbarProgressBarState.NoProgress);
         }
 
         private void buttonSettings_Click(object sender, EventArgs e)
