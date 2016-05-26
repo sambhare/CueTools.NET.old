@@ -1057,6 +1057,7 @@ namespace JDP {
             this.Name = "frmCUETools";
             this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.frmCUETools_FormClosed);
             this.Load += new System.EventHandler(this.frmCUETools_Load);
+            this.Shown += new System.EventHandler(this.frmCUETools_Shown);
             this.toolStripContainer1.BottomToolStripPanel.ResumeLayout(false);
             this.toolStripContainer1.BottomToolStripPanel.PerformLayout();
             this.toolStripContainer1.ContentPanel.ResumeLayout(false);

@@ -82,11 +82,6 @@ namespace JDP
             //m_state_image_list.ColorDepth = ColorDepth.Depth32Bit;
             //m_state_image_list.Images.Add("blank", new Bitmap(16, 16));
             //m_state_image_list.Images.Add("cue", Properties.Resources.cue3);
-
-            if (TaskbarManager.IsPlatformSupported)
-            {
-                m_tbManager = TaskbarManager.Instance;
-            }
         }
 
         private void AddCheckedNodesToBatch(TreeNodeCollection nodes)
@@ -418,6 +413,13 @@ namespace JDP
             SaveSettings();
         }
 
+        private void frmCUETools_Shown(object sender, EventArgs e)
+        {
+            if (TaskbarManager.IsPlatformSupported)
+            {
+                m_tbManager = TaskbarManager.Instance;
+            }
+        }
 
         public enum FileBrowserStateEnum
         {
