@@ -1415,7 +1415,7 @@ namespace JDP
 
         private void LoadSettings()
         {
-            SettingsReader sr = new SettingsReader("CUE Tools", "settings.txt", Application.ExecutablePath);
+            SettingsReader sr = new SettingsReader("CUE Tools", "settingsTEST.txt", Application.ExecutablePath);
             profilePath = sr.ProfilePath;
             _profile.Load(sr);
             lastMOTD = sr.LoadDate("LastMOTD") ?? DateTime.FromBinary(0);
@@ -1473,7 +1473,7 @@ namespace JDP
         {
             SaveProfile();
 
-            SettingsWriter sw = new SettingsWriter("CUE Tools", "settings.txt", Application.ExecutablePath);
+            SettingsWriter sw = new SettingsWriter("CUE Tools", "settingsTEST.txt", Application.ExecutablePath);
             SaveScripts(SelectedAction);
             sw.Save("LastMOTD", lastMOTD);
             sw.Save("ChoiceWidth", _choiceWidth);

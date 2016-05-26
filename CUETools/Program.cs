@@ -53,7 +53,7 @@ namespace JDP
 			Application.SetCompatibleTextRenderingDefault(false);
 
 			CUEConfig config = new CUEConfig();
-			config.Load(new SettingsReader("CUE Tools", "settings.txt", Application.ExecutablePath));
+			config.Load(new SettingsReader("CUE Tools", "settingsTEST.txt", Application.ExecutablePath));
 			try { Thread.CurrentThread.CurrentUICulture = CultureInfo.GetCultureInfo(config.language); }
 			catch { }
 			frmCUETools form = new frmCUETools();

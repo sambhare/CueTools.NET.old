@@ -24,7 +24,7 @@ namespace CUERipper
 			GetSatelliteAssemblies("Plugins (" + arch + ")");
 
 			CUEConfig config = new CUEConfig();
-			config.Load(new SettingsReader("CUERipper", "settings.txt", Application.ExecutablePath));
+			config.Load(new SettingsReader("CUERipper", "settingsTEST.txt", Application.ExecutablePath));
 			try { Thread.CurrentThread.CurrentUICulture = CultureInfo.GetCultureInfo(config.language); }
 			catch { }
 

@@ -147,7 +147,7 @@ namespace CUERipper
 			//CreateControlRegion(buttonTrackMetadata, new Bitmap(imageListChecked.Images[0]), imageListChecked.TransparentColor);
 			//CreateControlRegion(buttonTrackMetadata, Properties.Resources.cdrepair, Color.White);
 
-			SettingsReader sr = new SettingsReader("CUERipper", "settings.txt", Application.ExecutablePath);
+			SettingsReader sr = new SettingsReader("CUERipper", "settingsTEST.txt", Application.ExecutablePath);
 			_config.Load(sr);
             _config.CopyAlbumArt = false;
 			//_config.createEACLOG = sr.LoadBoolean("CreateEACLOG") ?? true;
@@ -933,7 +933,7 @@ namespace CUERipper
 
 		private void frmCUERipper_FormClosed(object sender, FormClosedEventArgs e)
 		{
-			SettingsWriter sw = new SettingsWriter("CUERipper", "settings.txt", Application.ExecutablePath);
+			SettingsWriter sw = new SettingsWriter("CUERipper", "settingsTEST.txt", Application.ExecutablePath);
 			_config.Save(sw);
 			//sw.Save("CreateEACLOG", _config.createEACLOG);
 			//sw.Save("PreserveHTOA", _config.preserveHTOA);

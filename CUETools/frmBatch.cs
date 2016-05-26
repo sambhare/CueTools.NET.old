@@ -242,7 +242,7 @@ namespace JDP
 		private void frmBatch_Load(object sender, EventArgs e)
 		{
 			textBox1.Hide();
-			//SettingsReader sr = new SettingsReader("CUE Tools", "settings.txt", Application.ExecutablePath);
+			//SettingsReader sr = new SettingsReader("CUE Tools", "settingsTEST.txt", Application.ExecutablePath);
 			//_profile.Load(sr);
 			//_reducePriority = sr.LoadBoolean("ReducePriority") ?? true;
 			_reducePriority = true;
