@@ -54,10 +54,6 @@ namespace CUERipper
 			m_icon_mgr.SetExtensionIcon(".m4a", Properties.Resources.ipod_sound);
 			m_icon_mgr.SetExtensionIcon(".ogg", Properties.Resources.ogg);
             m_icon_mgr.SetExtensionIcon(".wma", Properties.Resources.wma);
-            if (TaskbarManager.IsPlatformSupported)
-            {
-                m_tbManager = TaskbarManager.Instance;
-            }
         }
 
 		string[] OutputPathUseTemplates = {
@@ -368,10 +364,7 @@ namespace CUERipper
 			this.BeginInvoke((MethodInvoker)delegate()
 			{
 				toolStripStatusLabel1.Text = e.uri;
-                var progressValue = Math.Max(0, Math.Min(100, (int)(e.percent * 100)));
-                toolStripProgressBar1.Value = progressValue;
-                if (m_tbManager != null)
-                    m_tbManager.SetProgressValue(progressValue, 100);
+                toolStripProgressBar1.Value = Math.Max(0, Math.Min(100, (int)(e.percent * 100)));
 			});
 		}
 
@@ -391,18 +384,18 @@ namespace CUERipper
 				string.Format("{0}{1}...", e.Action, retry);
 			this.BeginInvoke((MethodInvoker)delegate()
 			{
-				toolStripStatusLabel1.Text = status;
-                var progressValue = Math.Max(0, Math.Min(100, (int)(percentTrck * 100)));
-                toolStripProgressBar1.Value = progressValue;
-                if (m_tbManager != null)
-                    m_tbManager.SetProgressValue(progressValue, 100);
+				toolStripStatusLabel1.Text = status;              
+                toolStripProgressBar1.Value = Math.Max(0, Math.Min(100, (int)(percentTrck * 100)));
                 
                 progressBarErrors.Value = Math.Min(progressBarErrors.Maximum, (int)(100 * Math.Log(e.ErrorsCount / 10.0 + 1) / Math.Log((e.PassEnd - e.PassStart) / 10.0 + 1)));
 				progressBarErrors.Enabled = e.Pass >= audioSource.CorrectionQuality;
 
 				progressBarCD.Maximum = (int) audioSource.TOC.AudioLength;
-				progressBarCD.Value = Math.Max(0, Math.Min(progressBarCD.Maximum, (int)e.PassStart + (e.PassEnd - e.PassStart) * (Math.Min(e.Pass, audioSource.CorrectionQuality) + 1) / (audioSource.CorrectionQuality + 1)));
-			});
+                var progressValue = Math.Max(0, Math.Min(progressBarCD.Maximum, (int)e.PassStart + (e.PassEnd - e.PassStart) * (Math.Min(e.Pass, audioSource.CorrectionQuality) + 1) / (audioSource.CorrectionQuality + 1)));
+                progressBarCD.Value = progressValue;
+                if (m_tbManager != null)
+                    m_tbManager.SetProgressValue(progressValue, (int) audioSource.TOC.AudioLength);
+            });
 		}
 
 		private void Rip(object o)
@@ -645,10 +638,7 @@ namespace CUERipper
 			this.BeginInvoke((MethodInvoker)delegate()
 			{
 				toolStripStatusLabel1.Text = text;
-                var progressValue = (100 + 2 * toolStripProgressBar1.Value) / 3;
-                toolStripProgressBar1.Value = progressValue;
-                if (m_tbManager != null)
-                    m_tbManager.SetProgressValue(progressValue, 100);
+                toolStripProgressBar1.Value = (100 + 2 * toolStripProgressBar1.Value) / 3;
 			});
 		}
 
@@ -1669,6 +1659,14 @@ namespace CUERipper
         private void pictureBox1_MouseLeave(object sender, EventArgs e)
         {
             toolStripStatusLabel1.Text = null;
+        }
+
+        private void frmCUERipper_Shown(object sender, EventArgs e)
+        {
+            if (TaskbarManager.IsPlatformSupported)
+            {
+                m_tbManager = TaskbarManager.Instance;
+            }
         }
 
         private void buttonEjectDisk_Click(object sender, EventArgs e)

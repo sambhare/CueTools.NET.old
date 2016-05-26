@@ -793,6 +793,7 @@ namespace CUERipper
             this.Name = "frmCUERipper";
             this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.frmCUERipper_FormClosed);
             this.Load += new System.EventHandler(this.frmCUERipper_Load);
+            this.Shown += new System.EventHandler(this.frmCUERipper_Shown);
             this.ClientSizeChanged += new System.EventHandler(this.frmCUERipper_ClientSizeChanged);
             this.KeyDown += new System.Windows.Forms.KeyEventHandler(this.frmCUERipper_KeyDown);
             this.statusStrip1.ResumeLayout(false);
